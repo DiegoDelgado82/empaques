@@ -15,7 +15,7 @@ const App = () => {
           <Link to="/" className="nav-link">Pantalla Principal</Link>
           <Link to="/agregar" className="nav-link">Agregar Empaque</Link>
           <Link to="/carga" className="nav-link">Carga Masiva de Productos Nuevos</Link>
-          <Link to="/gestionar" className="nav-link">Gestionar Producto</Link>
+          <Link to="/gestionar" className="nav-link">Gestionar Productos</Link>
           <Link to="/buscar-producto" className="nav-link">Buscar Producto</Link> 
         </div>
       </nav>
