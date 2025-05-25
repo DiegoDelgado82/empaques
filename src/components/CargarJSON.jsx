@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import Swal from 'sweetalert2';
 
 const CargarJSON = () => {
-  const [archivo, setArchivo] = useState(null);
+ 
 
   const manejarArchivo = async (e) => {
     const file = e.target.files[0];

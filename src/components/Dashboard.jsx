@@ -33,7 +33,6 @@ const Dashboard = () => {
       }
 
       const vencimientoDate = data.fechaVencimiento.toDate();
-      const envasadoDate = data.fechaEnvasado.toDate();
       const diasRestantes = dayjs(vencimientoDate).diff(dayjs(), 'day');
 
       return {
@@ -125,16 +124,12 @@ const cancelarEmpaque = async (id) => {
   }, []);
 
  useEffect(() => {
-  if (productos.length > 0) {
+  if (productos.length > 0 && !alertaMostrada) {
     actualizarVencidos();
-
-    if (!alertaMostrada) {
-      lanzarAlertas();
-      setAlertaMostrada(true);
-    }
+    lanzarAlertas();
+    setAlertaMostrada(true);
   }
 }, [productos]);
-
   return (
     <div className="container mt-4">
       <h2>Control de Productos Etiquetados</h2>
