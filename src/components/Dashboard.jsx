@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../firebaseConfig';
 import {
   collection,
@@ -19,74 +20,84 @@ const Dashboard = () => {
   const [productos, setProductos] = useState([]);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [alertaMostrada, setAlertaMostrada] = useState(false);
-  
+
   const obtenerProductos = async () => {
     const q = query(collection(db, 'empaques'));
     const snapshot = await getDocs(q);
 
     const lista = snapshot.docs.map(doc => {
       const data = doc.data();
+      if (!data.fechaVencimiento || !data.fechaEnvasado) return null;
 
-      if (!data.fechaVencimiento || !data.fechaEnvasado) {
-        console.warn(`Documento ${doc.id} sin fechas`);
-        return null;
-      }
-
-      const vencimientoDate = data.fechaVencimiento.toDate();
-      const diasRestantes = dayjs(vencimientoDate).diff(dayjs(), 'day');
+      const fechaVencimiento = data.fechaVencimiento.toDate();
+      const diasRestantes = dayjs(fechaVencimiento).diff(dayjs(), 'day');
 
       return {
-  id: doc.id,
-  ...data,
-  _rawFechaVencimiento: data.fechaVencimiento.toDate(),
-  fechaVencimiento: dayjs(data.fechaVencimiento.toDate()).format('DD/MM/YYYY'),
-  fechaEnvasado: dayjs(data.fechaEnvasado.toDate()).format('DD/MM/YYYY'),
-  diasRestantes
-};
+        id: doc.id,
+        ...data,
+        diasRestantes,
+        fechaVencimiento: dayjs(fechaVencimiento).format('DD/MM/YYYY'),
+        fechaEnvasado: dayjs(data.fechaEnvasado.toDate()).format('DD/MM/YYYY')
+      };
     });
 
     setProductos(lista.filter(Boolean));
   };
 
-  const actualizarVencidos = async () => {
+  const actualizarVencidos = useCallback(async () => {
     const hoy = dayjs().startOf('day');
 
     for (let p of productos) {
-     const vencimiento = dayjs(p._rawFechaVencimiento).startOf('day');
+      const vencimiento = dayjs(p._rawFechaVencimiento || p.fechaVencimiento, 'DD/MM/YYYY').startOf('day');
       if (p.estado === 'creado' && vencimiento.isBefore(hoy)) {
-        const productoRef = doc(db, 'empaques', p.id);
-        await updateDoc(productoRef, { estado: 'vencido' });
+        await updateDoc(doc(db, 'empaques', p.id), { estado: 'vencido' });
       }
     }
 
     obtenerProductos();
-  };
+  }, [productos]);
 
-  const lanzarAlertas = () => {
+  const lanzarAlertas = useCallback(() => {
     const criticos = productos.filter(p => p.estado === 'creado' && p.diasRestantes <= 3);
-
-    if (criticos.length > 0) {
+    if (criticos.length > 0 && !alertaMostrada) {
       Swal.fire({
         icon: 'warning',
         title: '¡Productos por vencer!',
         html: `Tenés <b>${criticos.length}</b> productos que vencen en 3 días o menos.`,
         confirmButtonText: 'Ver ahora'
       });
+      setAlertaMostrada(true);
     }
-  };
+  }, [productos, alertaMostrada]);
 
   const marcarComoRevisado = async (id) => {
     const ref = doc(db, 'empaques', id);
     const docSnap = await getDoc(ref);
-
     if (!docSnap.exists()) {
       Swal.fire('Error', 'No se encontró el documento.', 'error');
       return;
     }
 
     await updateDoc(ref, { estado: 'revisado' });
+    setProductos(prev => prev.filter(p => p.id !== id));
     Swal.fire('Revisado', 'Producto marcado como revisado.', 'success');
-    obtenerProductos();
+  };
+
+  const cancelarEmpaque = async (id) => {
+    const confirmar = await Swal.fire({
+      title: '¿Cancelar empaque?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cancelar',
+      cancelButtonText: 'No'
+    });
+
+    if (confirmar.isConfirmed) {
+      await updateDoc(doc(db, 'empaques', id), { estado: 'cancelado' });
+      setProductos(prev => prev.filter(p => p.id !== id));
+      Swal.fire('Cancelado', 'El empaque fue cancelado.', 'success');
+    }
   };
 
   const getColor = (dias) => {
@@ -94,25 +105,6 @@ const Dashboard = () => {
     if (dias <= 7) return 'table-warning';
     return 'table-success';
   };
-
-const cancelarEmpaque = async (id) => {
-  const confirmar = await Swal.fire({
-    title: '¿Cancelar empaque?',
-    text: 'Esta acción no se puede deshacer.',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: 'Sí, cancelar',
-    cancelButtonText: 'No'
-  });
-
-  if (confirmar.isConfirmed) {
-    const ref = doc(db, 'empaques', id);
-    await updateDoc(ref, { estado: 'cancelado' });
-    setProductos(prev => prev.filter(p => p.id !== id));
-    Swal.fire('Cancelado', 'El empaque fue cancelado.', 'success');
-  }
-};
-
 
   const productosFiltrados = productos.filter(p => {
     if (filtroEstado === 'todos') return p.estado !== 'cancelado' && p.estado !== 'revisado';
@@ -123,13 +115,13 @@ const cancelarEmpaque = async (id) => {
     obtenerProductos();
   }, []);
 
- useEffect(() => {
-  if (productos.length > 0 && !alertaMostrada) {
-    actualizarVencidos();
-    lanzarAlertas();
-    setAlertaMostrada(true);
-  }
-}, [productos]);
+  useEffect(() => {
+    if (productos.length > 0) {
+      actualizarVencidos();
+      lanzarAlertas();
+    }
+  }, [productos, actualizarVencidos, lanzarAlertas]);
+
   return (
     <div className="container mt-4">
       <h2>Control de Productos Etiquetados</h2>
@@ -141,7 +133,7 @@ const cancelarEmpaque = async (id) => {
           value={filtroEstado}
           onChange={(e) => setFiltroEstado(e.target.value)}
         >
-          <option value="todos">Todos (excepto cancelados)</option>
+          <option value="todos">Todos (excepto cancelados y revisados)</option>
           <option value="creado">Creados</option>
           <option value="revisado">Revisados</option>
           <option value="vencido">Vencidos</option>
@@ -149,64 +141,55 @@ const cancelarEmpaque = async (id) => {
         </select>
       </div>
 
-      <table className="table table-bordered table-hover">
-        <thead className="table-dark">
-          <tr>
-            <th>Descripción</th>
-            <th>PLU</th>
-            <th>Envasado</th>
-            <th>Vencimiento</th>
-            <th>Días restantes</th>
-            <th>Estado</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {productosFiltrados.map((p) => (
-            <tr key={p.id} className={getColor(p.diasRestantes)}>
-              <td>{p.descripcion}</td>
-              <td>{p.ean}</td>
-              <td>{p.fechaEnvasado}</td>
-              <td>{p.fechaVencimiento}</td>
-              <td>{p.diasRestantes}</td>
-              <td>{p.estado}</td>
-              <td>
-  {p.estado === 'creado' && (
-    <>
-      {/* Mostrar solo si está dentro del umbral de revisión */}
-      {(
-        (p.diasRestantes <= 5) 
-      ) && (
-        <button
-          className="btn btn-outline-primary btn-sm me-2"
-          onClick={() => marcarComoRevisado(p.id)}
-        >
-          <FaEye /> Revisar
-        </button>
-      )}
-
-      {/* Siempre se puede cancelar mientras esté en "creado" */}
-      <button
-        className="btn btn-outline-danger btn-sm"
-        onClick={() => cancelarEmpaque(p.id)}
-      >
-        Cancelar
-      </button>
-    </>
-  )}
-  {p.estado === 'vencido' && (
-    <button
-      className="btn btn-outline-primary btn-sm"
-      onClick={() => marcarComoRevisado(p.id)}
-    >
-      <FaEye /> Revisar Vencido
-    </button>
-  )}
-</td>
+      <div className="table-responsive">
+        <table className="table table-bordered table-hover">
+          <thead className="table-dark">
+            <tr>
+              <th>Descripción</th>
+              <th>PLU</th>
+              <th>Envasado</th>
+              <th>Vencimiento</th>
+              <th>Días restantes</th>
+              <th>Estado</th>
+              <th>Acción</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {productosFiltrados.map((p) => (
+              <tr key={p.id} className={getColor(p.diasRestantes)}>
+                <td>{p.descripcion}</td>
+                <td>{p.ean}</td>
+                <td>{p.fechaEnvasado}</td>
+                <td>{p.fechaVencimiento}</td>
+                <td>{p.diasRestantes}</td>
+                <td>{p.estado}</td>
+                <td>
+                  {p.estado === 'creado' && (
+                    <>
+                      {(
+                        (p.diasVencimiento === 30 && p.diasRestantes <= 7) ||
+                        (p.diasVencimiento === 14 && p.diasRestantes <= 4)
+                      ) && (
+                        <button className="btn btn-outline-primary btn-sm me-2" onClick={() => marcarComoRevisado(p.id)}>
+                          <FaEye /> Revisar
+                        </button>
+                      )}
+                      <button className="btn btn-outline-danger btn-sm" onClick={() => cancelarEmpaque(p.id)}>
+                        Cancelar
+                      </button>
+                    </>
+                  )}
+                  {p.estado === 'vencido' && (
+                    <button className="btn btn-outline-primary btn-sm" onClick={() => marcarComoRevisado(p.id)}>
+                      <FaEye /> Revisar Vencido
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

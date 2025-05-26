@@ -67,7 +67,7 @@ const PackagingTable = () => {
         <thead className="table-dark">
           <tr>
             <th>Producto</th>
-            <th>EAN</th>
+            <th>PLU</th>
             <th>Envasado</th>
             <th>Vencimiento</th>
             <th>Días Restantes</th>

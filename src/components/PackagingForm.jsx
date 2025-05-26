@@ -60,7 +60,7 @@ const PackagingForm = () => {
       <h2>Registrar Envasado</h2>
       <form onSubmit={handleSubmit} className="row g-3">
         <div className="col-md-6">
-          <label className="form-label">EAN</label>
+          <label className="form-label">PLU</label>
           <input
             type="text"
             className="form-control"
@@ -68,7 +68,7 @@ const PackagingForm = () => {
             
             onChange={(e) => setEan(e.target.value)}
             onBlur={handleSearch}
-            placeholder="Escaneá o escribí el EAN"
+            placeholder="Escribí el PLU"
           />
     
         </div>

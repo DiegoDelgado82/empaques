@@ -45,7 +45,7 @@ const GestionarProducto = () => {
         setProducto(null);
         setDescripcion('');
         setDiasVencimiento('');
-        Swal.fire('Producto nuevo', 'Podés registrar este EAN como nuevo.', 'info');
+        Swal.fire('Producto nuevo', 'Podés registrar este PLU como nuevo.', 'info');
       }
     } catch (error) {
       console.error(error);

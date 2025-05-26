@@ -69,7 +69,7 @@ const BuscarProductoPorDescripcion = () => {
 
       {productoSeleccionado && (
         <div className="alert alert-info mt-3">
-          <p><strong>EAN:</strong> {productoSeleccionado.ean}</p>
+          <p><strong>PLU:</strong> {productoSeleccionado.ean}</p>
           <p><strong>Descripción:</strong> {productoSeleccionado.descripcion}</p>
           <p><strong>Días hasta vencimiento:</strong> {productoSeleccionado.diasVencimiento}</p>
         </div>

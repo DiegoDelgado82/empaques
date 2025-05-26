@@ -18,7 +18,7 @@ const AgregarProducto = () => {
 
       if (querySnapshot.empty) {
         setProductoSeleccionado(null);
-        MySwal.fire("No encontrado", "No se encontró el producto con ese EAN", "warning");
+        MySwal.fire("No encontrado", "No se encontró el producto con ese PLU", "warning");
         return;
       }
 
