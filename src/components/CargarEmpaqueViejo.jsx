@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
 
-import { getDocs, query, where, collection, addDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import dayjs from 'dayjs';
 import Swal from 'sweetalert2';
@@ -8,26 +8,40 @@ import Swal from 'sweetalert2';
 const CargarEmpaqueViejo = () => {
   const [ean, setEan] = useState('');
   const [fechaEnvasado, setFechaEnvasado] = useState('');
+  const [productos, setProductos] = useState([]);
+  const [coincidencias, setCoincidencias] = useState([]);
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
-  const guardarEmpaque = async () => {
-  if (!ean || !fechaEnvasado) {
-    Swal.fire('Error', 'Completá el EAN y la fecha de envasado.', 'warning');
-    return;
-  }
+  useEffect(() => {
+    const fetchProductos = async () => {
+      const snapshot = await getDocs(collection(db, 'productos'));
+      const lista = snapshot.docs.map(doc => doc.data());
+      setProductos(lista);
+    };
+    fetchProductos();
+  }, []);
 
- 
-
-  try {
-    const q = query(collection(db, 'productos'), where('ean', '==', ean));
-    const snapshot = await getDocs(q);
-    Swal.close();
-
-    if (snapshot.empty) {
-      Swal.fire('No encontrado', 'No se encontró un producto con ese EAN.', 'error');
+  useEffect(() => {
+    if (ean.trim() === '') {
+      setCoincidencias([]);
+      setProductoSeleccionado(null);
       return;
     }
+    const filtro = productos.filter(p => p.ean.includes(ean));
+    setCoincidencias(filtro);
+  }, [ean, productos]);
 
-    const producto = snapshot.docs[0].data();
+  const seleccionarProducto = (producto) => {
+    setProductoSeleccionado(producto);
+    setEan(producto.ean);
+    setCoincidencias([]);
+  };
+
+  const guardarEmpaque = async () => {
+    if (!productoSeleccionado || !fechaEnvasado) {
+      Swal.fire('Error', 'Seleccioná un producto y una fecha válida.', 'warning');
+      return;
+    }
 
     const fechaBase = dayjs(fechaEnvasado, 'YYYY-MM-DD');
     if (!fechaBase.isValid()) {
@@ -35,31 +49,31 @@ const CargarEmpaqueViejo = () => {
       return;
     }
 
-    const vencimiento = fechaBase.add(producto.diasVencimiento, 'day');
+    const vencimiento = fechaBase.add(productoSeleccionado.diasVencimiento, 'day');
 
     const empaque = {
-      descripcion: producto.descripcion,
-      ean: producto.ean,
+      descripcion: productoSeleccionado.descripcion,
+      ean: productoSeleccionado.ean,
       fechaEnvasado: fechaBase.toDate(),
       fechaVencimiento: vencimiento.toDate(),
       estado: 'creado',
-      diasVencimiento: producto.diasVencimiento
+      diasVencimiento: productoSeleccionado.diasVencimiento
     };
 
-    await addDoc(collection(db, 'empaques'), empaque);
-
-    Swal.fire('Guardado', 'Empaque antiguo registrado correctamente.', 'success');
-    setEan('');
-    setFechaEnvasado('');
-  } catch (error) {
-    console.error(error);
-    Swal.close();
-    Swal.fire('Error', 'Ocurrió un error al guardar el empaque.', 'error');
-  }
-};
+    try {
+      await addDoc(collection(db, 'empaques'), empaque);
+      Swal.fire('Guardado', 'Empaque antiguo registrado correctamente.', 'success');
+      setEan('');
+      setFechaEnvasado('');
+      setProductoSeleccionado(null);
+    } catch (error) {
+      console.error(error);
+      Swal.fire('Error', 'Ocurrió un error al guardar el empaque.', 'error');
+    }
+  };
 
   return (
-    <div className="container mt-4">
+    <div className="container mt-4 position-relative">
       <h3>Cargar empaque antiguo</h3>
 
       <div className="mb-3">
@@ -70,6 +84,20 @@ const CargarEmpaqueViejo = () => {
           value={ean}
           onChange={(e) => setEan(e.target.value)}
         />
+        {coincidencias.length > 0 && (
+          <ul className="list-group position-absolute w-100" style={{ zIndex: 10 }}>
+            {coincidencias.map((p, index) => (
+              <li
+                key={index}
+                className="list-group-item list-group-item-action"
+                style={{ cursor: 'pointer' }}
+                onClick={() => seleccionarProducto(p)}
+              >
+                {p.ean} - {p.descripcion}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="mb-3">
@@ -81,6 +109,14 @@ const CargarEmpaqueViejo = () => {
           onChange={(e) => setFechaEnvasado(e.target.value)}
         />
       </div>
+
+      {productoSeleccionado && (
+        <div className="alert alert-info">
+          <strong>Producto seleccionado:</strong><br />
+          {productoSeleccionado.descripcion}<br />
+          {productoSeleccionado.diasVencimiento} días hasta vencimiento
+        </div>
+      )}
 
       <button className="btn btn-primary" onClick={guardarEmpaque}>
         Guardar empaque
