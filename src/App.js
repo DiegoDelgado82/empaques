@@ -4,6 +4,7 @@ import AgregarProducto from "./components/AgregarProducto";
 import CargarJSON from "./components/CargarJSON";
 import GestionarProducto from "./components/GestionarProducto";
 import BuscarProductoPorDescripcion from "./components/BuscarProductoPorDescripcion";
+import CargarEmpaqueViejo from './components/CargarEmpaqueViejo';
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 
@@ -37,6 +38,9 @@ const App = () => {
               <Link to="/agregar" className="nav-link" onClick={cerrarMenu}>Agregar Empaque</Link>
             </li>
             <li className="nav-item">
+              <Link to="/empaque-antiguo" className="nav-link" onClick={cerrarMenu}>Cargar Empaque Antiguo</Link>
+            </li>
+            <li className="nav-item">
               <Link to="/carga" className="nav-link" onClick={cerrarMenu}>Carga Masiva de Productos Nuevos</Link>
             </li>
             <li className="nav-item">
@@ -56,6 +60,7 @@ const App = () => {
           <Route path="/carga" element={<CargarJSON />} />
           <Route path="/gestionar" element={<GestionarProducto />} />
           <Route path="/buscar-producto" element={<BuscarProductoPorDescripcion />} />
+          <Route path="/empaque-antiguo" element={<CargarEmpaqueViejo />} />
         </Routes>
       </div>
     </Router>
